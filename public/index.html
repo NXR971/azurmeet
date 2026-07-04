@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AzurMeet — Rencontre en vidéo</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --blue:#2563eb; --blue-2:#3b82f6; --blue-light:#dbeafe; --blue-soft:#eff6ff;
+    --white:#ffffff; --text:#0f172a; --muted:#64748b; --danger:#ef4444;
+    --radius:20px; --shadow:0 10px 30px rgba(37,99,235,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+  body{background:linear-gradient(160deg,var(--white) 0%,var(--blue-soft) 45%,var(--blue-light) 100%);min-height:100vh;color:var(--text)}
+  .hidden{display:none!important}
+
+  /* ---------- ÉCRAN DE CONNEXION ---------- */
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{background:var(--white);border-radius:28px;box-shadow:var(--shadow);padding:48px 44px;max-width:430px;width:100%;text-align:center;border:1px solid #e2e8f0}
+  .logo{font-size:38px;font-weight:800;letter-spacing:-1px}
+  .logo span{color:var(--blue)}
+  .logo-badge{display:inline-flex;align-items:center;justify-content:center;width:74px;height:74px;border-radius:22px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font-size:34px;margin-bottom:16px;box-shadow:0 8px 20px rgba(37,99,235,.35)}
+  .tagline{color:var(--muted);margin:10px 0 30px;font-size:15px;line-height:1.5}
+  #googleBtn{display:flex;justify-content:center}
+  .login-note{margin-top:22px;font-size:12px;color:var(--muted)}
+  .cfg-warn{margin-top:16px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:10px 14px;border-radius:12px;font-size:13px;display:none}
+
+  /* ---------- ÉCRAN DE BAN ---------- */
+  #banScreen{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:100;display:flex;align-items:center;justify-content:center}
+  .ban-card{background:var(--white);border-radius:24px;padding:44px 40px;text-align:center;max-width:420px;width:92%}
+  .ban-card .icon{font-size:56px}
+  .ban-card h2{margin:12px 0 8px;font-size:24px}
+  .ban-card p{color:var(--muted);font-size:15px;line-height:1.5}
+  #banTimer{font-size:40px;font-weight:800;color:var(--danger);margin-top:16px;font-variant-numeric:tabular-nums}
+
+  /* ---------- APPLICATION ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 26px;background:var(--white);box-shadow:0 2px 12px rgba(37,99,235,.08);position:sticky;top:0;z-index:10}
+  .h-logo{font-size:22px;font-weight:800}
+  .h-logo span{color:var(--blue)}
+  .h-user{display:flex;align-items:center;gap:10px}
+  .h-user img{width:36px;height:36px;border-radius:50%;border:2px solid var(--blue-light)}
+  .h-user .uname{font-weight:600;font-size:14px}
+  .btn-out{background:none;border:1px solid #e2e8f0;border-radius:10px;padding:7px 13px;font-size:13px;color:var(--muted);cursor:pointer}
+  .btn-out:hover{border-color:var(--blue);color:var(--blue)}
+
+  main{max-width:1250px;margin:0 auto;padding:22px 20px 30px}
+  .videos{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:900px){.videos{grid-template-columns:1fr}}
+  .panel{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;border:1px solid #e2e8f0}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #f1f5f9}
+  .panel-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#cbd5e1}
+  .dot.on{background:#22c55e}
+  .video-box{position:relative;aspect-ratio:4/3;background:linear-gradient(135deg,#0f172a,#1e3a8a)}
+  video{width:100%;height:100%;object-fit:cover;display:block}
+  #localVideo{transform:scaleX(-1)}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;text-align:center;padding:20px}
+  .overlay p{font-size:14px;opacity:.85;max-width:280px;line-height:1.5}
+  .overlay img{width:84px;height:84px;border-radius:50%;border:3px solid rgba(255,255,255,.4)}
+  .btn{border:none;border-radius:14px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
+  .btn:active{transform:scale(.97)}
+  .btn-blue{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.35)}
+  .btn-blue:hover{filter:brightness(1.07)}
+  .btn-white{background:var(--white);color:var(--blue);border:2px solid var(--blue-light)}
+  .btn-white:hover{border-color:var(--blue)}
+  .btn-danger{background:#fee2e2;color:var(--danger)}
+  .btn-danger:hover{background:#fecaca}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .panel-foot{display:flex;gap:10px;padding:12px 16px;flex-wrap:wrap;align-items:center}
+  .icon-btn{width:46px;height:46px;border-radius:13px;border:2px solid var(--blue-light);background:var(--white);font-size:19px;cursor:pointer;transition:.15s}
+  .icon-btn:hover{border-color:var(--blue)}
+  .icon-btn.off{background:#fee2e2;border-color:#fecaca}
+  .spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .partner-info{font-size:13px;color:var(--muted)}
+
+  /* ---------- BARRE DU BAS ---------- */
+  .controls{margin-top:20px;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e2e8f0;padding:18px 22px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  select{padding:11px 14px;border-radius:12px;border:2px solid var(--blue-light);background:var(--white);font-size:14px;font-weight:600;color:var(--text);cursor:pointer;min-width:170px}
+  select:focus{outline:none;border-color:var(--blue)}
+  .gender-toggle{display:flex;gap:8px}
+  .gender-btn{padding:11px 20px;border-radius:12px;border:2px solid var(--blue-light);background:var(--white);font-size:14px;font-weight:700;cursor:pointer;color:var(--muted)}
+  .gender-btn.sel-boy{background:var(--blue);border-color:var(--blue);color:#fff}
+  .gender-btn.sel-girl{background:#ec4899;border-color:#ec4899;color:#fff}
+  .my-country{font-size:14px;font-weight:600;color:var(--muted);padding:11px 0}
+  .grow{flex:1}
+  #statusMsg{font-size:14px;font-weight:600;color:var(--blue)}
+
+  /* ---------- CHAT ---------- */
+  .chat{margin-top:20px;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e2e8f0;overflow:hidden}
+  .chat-head{padding:12px 18px;border-bottom:1px solid #f1f5f9;font-weight:700;font-size:15px}
+  #chatMessages{height:190px;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+  .msg{max-width:70%;padding:9px 14px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word}
+  .msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;border-bottom-right-radius:4px}
+  .msg.them{align-self:flex-start;background:var(--blue-soft);color:var(--text);border-bottom-left-radius:4px}
+  .msg.sys{align-self:center;background:none;color:var(--muted);font-size:12px}
+  .chat-input{display:flex;gap:10px;padding:12px 16px;border-top:1px solid #f1f5f9}
+  .chat-input input{flex:1;padding:12px 16px;border-radius:12px;border:2px solid var(--blue-light);font-size:14px}
+  .chat-input input:focus{outline:none;border-color:var(--blue)}
+
+  /* ---------- TOASTS ---------- */
+  #toasts{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .toast{background:var(--text);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pop .2s}
+  .toast.warn{background:#b45309}
+  .toast.err{background:var(--danger)}
+  @keyframes pop{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<!-- ÉCRAN 1 : CONNEXION GOOGLE -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo-badge">💬</div>
+    <div class="logo">Azur<span>Meet</span></div>
+    <p class="tagline">Rencontre de nouvelles personnes en vidéo, partout dans le monde. Connecte-toi pour commencer.</p>
+    <div id="googleBtn"></div>
+    <div class="cfg-warn" id="cfgWarn">⚠️ Le Client ID Google n'est pas encore configuré sur le serveur (voir README.md).</div>
+    <p class="login-note">Connexion sécurisée avec ton compte Google.</p>
+  </div>
+</div>
+
+<!-- ÉCRAN DE BAN -->
+<div id="banScreen" class="hidden">
+  <div class="ban-card">
+    <div class="icon">🚫</div>
+    <h2>Tu as été banni</h2>
+    <p>Tu as reçu 3 signalements. Tu pourras revenir dans :</p>
+    <div id="banTimer">60:00</div>
+  </div>
+</div>
+
+<!-- APPLICATION -->
+<div id="app" class="hidden">
+  <header>
+    <div class="h-logo">Azur<span>Meet</span></div>
+    <div class="h-user">
+      <img id="userPic" src="" alt="">
+      <span class="uname" id="userName"></span>
+      <button class="btn-out" onclick="location.reload()">Déconnexion</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="videos">
+      <!-- ÉCRAN GAUCHE : MOI -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="dot" id="myDot"></span> Toi</div>
+          <span class="partner-info" id="myCamState">Caméra désactivée</span>
+        </div>
+        <div class="video-box">
+          <video id="localVideo" autoplay playsinline muted></video>
+          <div class="overlay" id="localOverlay">
+            <p>Pour utiliser AzurMeet, active ta caméra. Ton navigateur va te demander la permission.</p>
+            <button class="btn btn-blue" id="enableCamBtn">🎥 Activer ma caméra</button>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button class="icon-btn" id="camToggle" title="Activer/désactiver la caméra" disabled>📷</button>
+          <button class="icon-btn" id="micToggle" title="Activer/désactiver le micro" disabled>🎤</button>
+        </div>
+      </div>
+
+      <!-- ÉCRAN DROIT : L'INCONNU -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="dot" id="remoteDot"></span> <span id="partnerTitle">Inconnu</span></div>
+          <span class="partner-info" id="partnerInfo"></span>
+        </div>
+        <div class="video-box">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="overlay" id="remoteOverlay">
+            <p id="remoteOverlayText">Choisis ton genre et clique sur « Commencer » pour rencontrer quelqu'un.</p>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button class="btn btn-blue grow" id="startBtn">▶ Commencer</button>
+          <button class="btn btn-white" id="nextBtn" disabled>⏭ Suivant</button>
+          <button class="btn btn-danger" id="reportBtn" disabled>⚠️ Signaler</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BARRE DU BAS : PAYS + GENRE -->
+    <div class="controls">
+      <div class="field">
+        <label>Je suis</label>
+        <div class="gender-toggle">
+          <button class="gender-btn" id="boyBtn">👦 Garçon</button>
+          <button class="gender-btn" id="girlBtn">👧 Fille</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Pays à rencontrer</label>
+        <select id="wantCountry"><option value="ALL">🌍 Tous les pays</option></select>
+      </div>
+      <div class="field">
+        <label>Ton pays (détecté)</label>
+        <div class="my-country" id="myCountryLabel">Détection…</div>
+      </div>
+      <div class="grow"></div>
+      <span id="statusMsg"></span>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat">
+      <div class="chat-head">💬 Chat</div>
+      <div id="chatMessages"></div>
+      <div class="chat-input">
+        <input id="chatInput" type="text" placeholder="Écris un message…" maxlength="500" disabled>
+        <button class="btn btn-blue" id="chatSend" disabled>Envoyer</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ================== PAYS ==================
+const COUNTRIES = [
+  ["FR","France"],["BE","Belgique"],["CH","Suisse"],["CA","Canada"],["US","États-Unis"],
+  ["GB","Royaume-Uni"],["DE","Allemagne"],["ES","Espagne"],["IT","Italie"],["PT","Portugal"],
+  ["NL","Pays-Bas"],["MA","Maroc"],["DZ","Algérie"],["TN","Tunisie"],["SN","Sénégal"],
+  ["CI","Côte d'Ivoire"],["CM","Cameroun"],["CD","RD Congo"],["MG","Madagascar"],["HT","Haïti"],
+  ["BR","Brésil"],["MX","Mexique"],["AR","Argentine"],["CO","Colombie"],["JP","Japon"],
+  ["KR","Corée du Sud"],["CN","Chine"],["IN","Inde"],["TR","Turquie"],["RU","Russie"],
+  ["UA","Ukraine"],["PL","Pologne"],["RO","Roumanie"],["GR","Grèce"],["SE","Suède"],
+  ["NO","Norvège"],["DK","Danemark"],["FI","Finlande"],["IE","Irlande"],["AT","Autriche"],
+  ["AU","Australie"],["NZ","Nouvelle-Zélande"],["EG","Égypte"],["NG","Nigéria"],["ZA","Afrique du Sud"],
+  ["SA","Arabie Saoudite"],["AE","Émirats"],["LB","Liban"],["TH","Thaïlande"],["VN","Vietnam"],
+  ["PH","Philippines"],["ID","Indonésie"],["PK","Pakistan"],["BD","Bangladesh"],["US","États-Unis"]
+];
+function flag(cc){
+  if(!cc||cc.length!==2||cc==='XX') return '🌍';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>0x1F1A5+c.charCodeAt(0)));
+}
+function countryName(cc){
+  const f=COUNTRIES.find(c=>c[0]===cc); return f?f[1]:cc;
+}
+
+// ================== ÉTAT ==================
+let socket=null, pc=null, localStream=null;
+let myGender=null, myCountry='XX';
+let inCall=false, searching=false, banInterval=null;
+const $=id=>document.getElementById(id);
+
+// ================== TOASTS ==================
+function toast(text,type=''){
+  const t=document.createElement('div');
+  t.className='toast '+type; t.textContent=text;
+  $('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+// ================== CONNEXION GOOGLE ==================
+async function initLogin(){
+  const cfg=await fetch('/api/config').then(r=>r.json()).catch(()=>({}));
+  const clientId=cfg.googleClientId||'';
+  if(!clientId||clientId.startsWith('REMPLACE_MOI')) $('cfgWarn').style.display='block';
+  const wait=setInterval(()=>{
+    if(window.google&&google.accounts){
+      clearInterval(wait);
+      google.accounts.id.initialize({client_id:clientId,callback:onGoogleLogin});
+      google.accounts.id.renderButton($('googleBtn'),{theme:'filled_blue',size:'large',shape:'pill',text:'continue_with',locale:'fr'});
+    }
+  },100);
+}
+function onGoogleLogin(resp){
+  socket=io();
+  bindSocket();
+  socket.emit('auth',{credential:resp.credential});
+}
+
+// ================== SOCKET ==================
+function bindSocket(){
+  socket.on('auth-ok',({name,picture})=>{
+    $('loginScreen').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    $('userName').textContent=name||'';
+    if(picture) $('userPic').src=picture;
+    detectCountry();
+  });
+  socket.on('auth-error',({message})=>toast(message,'err'));
+
+  socket.on('waiting',()=>{
+    searching=true;
+    setRemoteOverlay('spinner','Recherche d\'une personne…');
+    $('statusMsg').textContent='🔍 Recherche en cours…';
+  });
+
+  socket.on('matched',async({partner,initiator})=>{
+    searching=false; inCall=true;
+    $('partnerTitle').textContent=partner.name||'Inconnu';
+    $('partnerInfo').textContent=flag(partner.country)+' '+countryName(partner.country)+' · '+(partner.gender==='boy'?'👦':'👧');
+    $('remoteDot').classList.add('on');
+    $('statusMsg').textContent='✅ Connecté avec '+(partner.name||'quelqu\'un');
+    setRemoteOverlay('spinner','Connexion vidéo…');
+    enableCallButtons(true);
+    addSys('Tu es maintenant avec '+(partner.name||'un inconnu')+' '+flag(partner.country));
+    await startPeer(initiator);
+  });
+
+  socket.on('signal',async(data)=>{
+    if(!pc) return;
+    try{
+      if(data.sdp){
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        if(data.sdp.type==='offer'){
+          const answer=await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('signal',{sdp:pc.localDescription});
+        }
+      }else if(data.candidate){
+        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    }catch(e){console.error(e);}
+  });
+
+  socket.on('partner-left',()=>{
+    addSys('La personne est partie. Recherche d\'une nouvelle personne…');
+    endCall();
+    socket.emit('next');
+  });
+
+  socket.on('chat',({text})=>addMsg(text,'them'));
+
+  socket.on('partner-cam',({on})=>{
+    if(!inCall) return;
+    if(on){ $('remoteOverlay').classList.add('hidden'); }
+    else{ setRemoteOverlay('none','📷 La personne a coupé sa caméra'); }
+  });
+
+  socket.on('warning',({count,max})=>{
+    toast('⚠️ Avertissement '+count+'/'+max+' — tu as été signalé. À '+max+' tu seras banni 1h.','warn');
+  });
+
+  socket.on('report-ok',({count,banned})=>{
+    if(banned){ toast('La personne a été bannie 1 heure.'); addSys('Personne bannie. Recherche…'); endCall(); }
+    else toast('Signalement envoyé ('+count+'/3).');
+  });
+
+  socket.on('banned',({remainingMs})=>{
+    endCall(); searching=false;
+    $('banScreen').classList.remove('hidden');
+    let end=Date.now()+remainingMs;
+    clearInterval(banInterval);
+    const tick=()=>{
+      const left=Math.max(0,end-Date.now());
+      const m=Math.floor(left/60000), s=Math.floor(left%60000/1000);
+      $('banTimer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+      if(left<=0){clearInterval(banInterval);location.reload();}
+    };
+    tick(); banInterval=setInterval(tick,1000);
+  });
+
+  socket.on('error-msg',({message})=>toast(message,'err'));
+  socket.on('disconnect',()=>{ if(inCall){endCall();} $('statusMsg').textContent='Connexion perdue…'; });
+}
+
+// ================== PAYS (détection + liste) ==================
+async function detectCountry(){
+  const sel=$('wantCountry');
+  const seen=new Set();
+  COUNTRIES.forEach(([cc,name])=>{
+    if(seen.has(cc))return; seen.add(cc);
+    const o=document.createElement('option');
+    o.value=cc; o.textContent=flag(cc)+' '+name;
+    sel.appendChild(o);
+  });
+  try{
+    const d=await fetch('https://ipapi.co/json/').then(r=>r.json());
+    if(d&&d.country_code) myCountry=d.country_code.toUpperCase();
+  }catch(e){
+    const lang=(navigator.language||'').split('-')[1];
+    if(lang&&lang.length===2) myCountry=lang.toUpperCase();
+  }
+  $('myCountryLabel').textContent=flag(myCountry)+' '+countryName(myCountry);
+}
+
+// ================== CAMÉRA ==================
+$('enableCamBtn').onclick=async()=>{
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720},audio:true});
+    $('localVideo').srcObject=localStream;
+    $('localOverlay').classList.add('hidden');
+    $('myDot').classList.add('on');
+    $('myCamState').textContent='Caméra active';
+    $('camToggle').disabled=false; $('micToggle').disabled=false;
+  }catch(e){
+    toast('Tu as refusé la caméra. Autorise-la pour utiliser le site.','err');
+  }
+};
+
+$('camToggle').onclick=()=>{
+  if(!localStream) return;
+  const track=localStream.getVideoTracks()[0]; if(!track) return;
+  track.enabled=!track.enabled;
+  $('camToggle').classList.toggle('off',!track.enabled);
+  $('myCamState').textContent=track.enabled?'Caméra active':'Caméra coupée';
+  $('myDot').classList.toggle('on',track.enabled);
+  if(socket) socket.emit('cam-state',{on:track.enabled});
+};
+
+$('micToggle').onclick=()=>{
+  if(!localStream) return;
+  const track=localStream.getAudioTracks()[0]; if(!track) return;
+  track.enabled=!track.enabled;
+  $('micToggle').classList.toggle('off',!track.enabled);
+};
+
+// ================== GENRE ==================
+$('boyBtn').onclick=()=>{myGender='boy';$('boyBtn').classList.add('sel-boy');$('girlBtn').classList.remove('sel-girl');};
+$('girlBtn').onclick=()=>{myGender='girl';$('girlBtn').classList.add('sel-girl');$('boyBtn').classList.remove('sel-boy');};
+
+// ================== RECHERCHE ==================
+$('startBtn').onclick=()=>{
+  if(!localStream){toast('Active d\'abord ta caméra 🎥','err');return;}
+  if(!myGender){toast('Choisis si tu es un garçon ou une fille 👇','err');return;}
+  socket.emit('find',{gender:myGender,myCountry,wantCountry:$('wantCountry').value});
+  $('startBtn').disabled=true;
+};
+
+$('nextBtn').onclick=()=>{
+  addSys('Tu passes à la personne suivante…');
+  endCall();
+  socket.emit('next');
+};
+
+$('reportBtn').onclick=()=>{
+  if(!inCall) return;
+  if(confirm('Signaler cette personne pour comportement inapproprié ?')) socket.emit('report');
+};
+
+function enableCallButtons(on){
+  $('nextBtn').disabled=!on&&!searching;
+  $('reportBtn').disabled=!on;
+  $('chatInput').disabled=!on;
+  $('chatSend').disabled=!on;
+  $('nextBtn').disabled=!on;
+}
+
+// ================== WEBRTC ==================
+async function startPeer(initiator){
+  pc=new RTCPeerConnection({iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'}
+  ]});
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.ontrack=(e)=>{
+    $('remoteVideo').srcObject=e.streams[0];
+    $('remoteOverlay').classList.add('hidden');
+  };
+  pc.onicecandidate=(e)=>{ if(e.candidate) socket.emit('signal',{candidate:e.candidate}); };
+  pc.onconnectionstatechange=()=>{
+    if(pc&&(pc.connectionState==='failed'||pc.connectionState==='disconnected')){
+      if(inCall){ addSys('Connexion vidéo perdue.'); }
+    }
+  };
+  if(initiator){
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('signal',{sdp:pc.localDescription});
+  }
+  // informe du statut de ma caméra
+  const vt=localStream.getVideoTracks()[0];
+  socket.emit('cam-state',{on:vt?vt.enabled:false});
+}
+
+function endCall(){
+  inCall=false;
+  if(pc){try{pc.close();}catch(e){} pc=null;}
+  $('remoteVideo').srcObject=null;
+  $('remoteDot').classList.remove('on');
+  $('partnerTitle').textContent='Inconnu';
+  $('partnerInfo').textContent='';
+  enableCallButtons(false);
+  $('startBtn').disabled=false;
+  setRemoteOverlay('none','Clique sur « Commencer » ou « Suivant » pour rencontrer quelqu\'un.');
+}
+
+function setRemoteOverlay(mode,text){
+  const ov=$('remoteOverlay');
+  ov.classList.remove('hidden');
+  ov.innerHTML=(mode==='spinner'?'<div class="spinner"></div>':'')+'<p>'+text+'</p>';
+}
+
+// ================== CHAT ==================
+function addMsg(text,who){
+  const d=document.createElement('div');
+  d.className='msg '+who; d.textContent=text;
+  $('chatMessages').appendChild(d);
+  $('chatMessages').scrollTop=$('chatMessages').scrollHeight;
+}
+function addSys(text){addMsg(text,'sys');}
+function sendChat(){
+  const v=$('chatInput').value.trim();
+  if(!v||!inCall) return;
+  socket.emit('chat',{text:v});
+  addMsg(v,'me');
+  $('chatInput').value='';
+}
+$('chatSend').onclick=sendChat;
+$('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+initLogin();
+</script>
+</body>
+</html>
