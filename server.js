@@ -114,13 +114,13 @@ io.on('connection', (socket) => {
   let authed = false;
 
   // Connexion Google : le navigateur envoie le jeton, on le vérifie vraiment
-  socket.on('auth', async ({ credential }) => {
+  socket.on('auth', async ({ credential, accessToken }) => {
     try {
-      const ticket = await googleClient.verifyIdToken({
+      let payload; if (accessToken) { const info = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token='+encodeURIComponent(accessToken)).then(r=>r.ok?r.json():null); if (!info || info.aud !== GOOGLE_CLIENT_ID) throw new Error('bad token'); payload = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}}).then(r=>r.ok?r.json():null); if(!payload||!payload.sub) throw new Error('no userinfo'); } else { const ticket = await googleClient.verifyIdToken({
         idToken: credential,
         audience: GOOGLE_CLIENT_ID,
       });
-      const payload = ticket.getPayload();
+      payload = ticket.getPayload(); }
       const userId = payload.sub;
 
       if (isBanned(userId)) {
