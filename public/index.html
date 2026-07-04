@@ -119,7 +119,7 @@
     <div class="logo-badge">💬</div>
     <div class="logo">Azur<span>Meet</span></div>
     <p class="tagline">Rencontre de nouvelles personnes en vidéo, partout dans le monde. Connecte-toi pour commencer.</p>
-    <div id="googleBtn"></div>
+    <button class="btn btn-blue" id="googleLoginBtn" style="width:100%">Continuer avec Google</button>
     <div class="cfg-warn" id="cfgWarn">⚠️ Le Client ID Google n'est pas encore configuré sur le serveur (voir README.md).</div>
     <p class="login-note">Connexion sécurisée avec ton compte Google.</p>
   </div>
@@ -264,17 +264,17 @@ async function initLogin(){
   const clientId=cfg.googleClientId||'';
   if(!clientId||clientId.startsWith('REMPLACE_MOI')) $('cfgWarn').style.display='block';
   const wait=setInterval(()=>{
-    if(window.google&&google.accounts){
+    if(window.google&&google.accounts&&google.accounts.oauth2){
       clearInterval(wait);
-      google.accounts.id.initialize({client_id:clientId,callback:onGoogleLogin});
-      google.accounts.id.renderButton($('googleBtn'),{theme:'filled_blue',size:'large',shape:'pill',text:'continue_with',locale:'fr'});
+      window.__tc=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:'openid profile email',callback:onGoogleLogin});
     }
   },100);
 }
 function onGoogleLogin(resp){
+  if(!resp||!resp.access_token){toast('Connexion Google annulée.','err');return;}
   socket=io();
   bindSocket();
-  socket.emit('auth',{credential:resp.credential});
+  socket.emit('auth',{accessToken:resp.access_token});
 }
 
 // ================== SOCKET ==================
@@ -508,6 +508,7 @@ function sendChat(){
 $('chatSend').onclick=sendChat;
 $('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
 
+$('googleLoginBtn').onclick=()=>{if(window.__tc)window.__tc.requestAccessToken();else toast('Google charge encore, réessaie dans 2 secondes.','err');};
 initLogin();
 </script>
 </body>
